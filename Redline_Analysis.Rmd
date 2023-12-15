@@ -1,0 +1,217 @@
+---
+title: "Mapping Inequality"
+author: "Kate Becker"
+date: "2023-12-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, eval = FALSE)
+```
+
+
+# Overview 
+The term "environmental injustice" leads people to believe this is a 
+
+
+
+Github: https://github.com/kateebeckerr/Redlining_Injustices
+
+# Data Descriptors
+
+1. EJ Screen: We will be working with data from the United States Environmental Protection Agency's EJScreen: Environmental Justice Screening and Mapping Tool
+
+
+
+## Relevant Libraries and Setting Path
+```{r}
+library(tidyverse)
+library(sf)
+library(tmap)
+library(spData)
+library(spDataLarge)
+library(terra)
+library(dplyr)
+library(leaflet)
+library(ggplot2)
+library(raster)
+library(readr)
+library(readxl)
+library(maps)
+library(spData)
+library(grid)
+library(viridis)
+library(cowplot)
+library(tmap)
+library(tmaptools)
+library(ggsn)
+
+```
+
+## Data Read In
+
+### EJ Screen 
+```{r}
+# read in EJScreen data
+ejscreen <- st_read("./data/EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb/") 
+
+# filter to LA county
+LA_ejscreen <- ejscreen %>%
+  filter(CNTY_NAME %in% c("Los Angeles County"))
+
+```
+
+```{r}
+census_95 <- LA %>%
+  filter(P_PWDIS >= 95)
+
+census_95 <- st_centroid(census_95)
+
+coordLA <- st_bbox(LA)
+print(coordLA)
+```
+
+```{r}
+LA_waste_1 <- LA %>%
+  ggplot() +
+  geom_sf(data = LA, aes(fill = P_PWDIS))+
+  geom_sf(data = census_95, color = "red", shape = 5, size = 0.5) +
+  scale_fill_gradient(low = "lightyellow", high = "darkorange", name = "Percentile for Wastewater discharge") +
+  coord_sf(
+    ylim = c(3980000, 4139895)
+  ) +
+  ggtitle("Wastewater in Los Angeles County") 
+
+LA_waste_1
+
+```
+
+```{r}
+low_income_5 <- LA %>%
+  filter(LOWINCPCT < 0.05) 
+  
+percent_low <- (nrow(low_income_5) / nrow(LA)) * 100
+
+print(percent_low)
+```
+
+```{r}
+pm25_80 <- quantile(LA$P_PM25, 0.8, na.rm = TRUE)
+pnpl_80 <- quantile(LA$P_PNPL, 0.8, na.rm = TRUE)
+
+
+pnpl_pm25_80 <- LA %>%
+  filter(P_PM25 > pm25_80, P_PNPL > pnpl_80)
+
+
+above_80t <- (nrow(pnpl_pm25_80) / nrow(LA)) * 100
+
+print(above_80t)
+```
+
+```{r}
+LA_redlining <- st_read("https://dsl.richmond.edu/panorama/redlining/static/downloads/geojson/CALosAngeles1939.geojson") %>%
+  st_make_valid()
+```
+
+```{r}
+coordLA_red <- st_bbox(LA_redlining)
+print(coordLA_red)
+
+crs1 <- st_crs(LA)
+crs2 <- st_crs(LA_redlining)
+
+LAred_transformed <- st_transform(LA_redlining, crs1)
+
+LA_LAredline <- st_intersects(LAred_transformed, LA)
+
+```
+
+```{r}
+LA_LAred <- LA %>%
+  ggplot() +
+  geom_sf(data = LA) +
+  geom_sf(data = LA_redlining, aes(fill = holc_grade)) +
+  ggtitle("Redlining in Los Angeles by HOLC Grade") +
+  coord_sf(
+    ylim = c(3980000, 4139895)
+  )
+
+print(LA_LAred)
+
+```
+
+```{r}
+count_HOLCandCensus <- count(LAred_transformed, holc_grade)
+print(count_HOLCandCensus)
+
+LosAngeles_redline_join <- st_join(LA, LAred_transformed, join = st_within, left = FALSE)
+
+mean(LosAngeles_redline_join$LOWINCPCT)
+mean(LosAngeles_redline_join$P_PM25, holc_group = "A")
+mean(LosAngeles_redline_join$P_LIFEEXPPCT, na.rm = TRUE, holc_group = "A")
+mean(LosAngeles_redline_join$P_CANCER)
+
+```
+
+
+```{r}
+sum_mean_redline <- LosAngeles_redline_join %>%
+  group_by(holc_grade) %>%
+  summarise(
+    mean_LOWINCPCT = mean(LOWINCPCT),
+    mean_P_PM25 = mean(P_PM25),
+    mean_P_LIFEEXPPCT = mean(P_LIFEEXPPCT, na.rm = TRUE),
+    mean_P_CANCER = mean(P_CANCER))
+
+print(sum_mean_redline)
+```
+
+```{r}
+
+#read in biodiverstiy data
+biodiversity <- st_read("/Users/katebecker/Documents/Bren/Fall_Q/EDS_223/HW/data/gbif-birds-LA") 
+
+```
+
+```{r}
+CRSa <- st_crs(LA_redlining)
+CRSb <- st_crs(biodiversity)
+
+biodiversity_transformed <- st_transform(biodiversity, CRSa)
+
+```
+
+```{r}
+result <- st_join(biodiversity_transformed, LA_redlining, join = st_within, left = FALSE) 
+```
+
+```{r}
+
+result <- st_join(biodiversity_transformed, LA_redlining, join = st_within, left = FALSE) %>%
+  st_set_geometry(NULL) %>%
+  count(name = "geometry", holc_grade)
+
+total_count <- sum(result$geometry)
+
+view(total_count)
+
+percentages <- result %>%
+  group_by(holc_grade) %>%
+  summarise(percentage = (geometry / total_count) * 100)
+
+view(percentages)
+
+ggplot(data = percentages, aes(x = holc_grade,y = percentage)) +
+  geom_boxplot(colour = "blue") +
+  ylim(0, 100) +
+  xlab("HOLC Grade") +
+  ylab("Percent Observations") +
+  ggtitle("Biodiversity Observations Within Each Redlining Category")
+
+
+
+```
+
+
+
