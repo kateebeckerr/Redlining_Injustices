@@ -1,5 +1,5 @@
 ---
-title: "Mapping Inequality"
+title: "Redlining in Current Environmental Injustices"
 author: "Kate Becker"
 date: "2023-12-15"
 output: html_document
@@ -14,13 +14,19 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, eval = FALS
 The term "environmental injustice" leads people to believe this is a 
 
 
+Redlining was the practice of categorically denying access to mortagages not jsut to individuals but to whole neighborhoods 
 
+For more information regarding the workflow, data, and reproducibility of this repository please see the Github link below
 Github: https://github.com/kateebeckerr/Redlining_Injustices
+
 
 # Data Descriptors
 
-1. EJ Screen: We will be working with data from the United States Environmental Protection Agency's EJScreen: Environmental Justice Screening and Mapping Tool
+1. EJ Screen: Data from the United States Environmental Protection Agency's Environmental Justice Screening and Mapping Tool. This data is publicly accessible in order to be more transparent about how they consider environmental justice(EJ) in their work, to assist stakeholders in making informed decisions about pursuing EJ, and to create a common starting point between the agency and the public when looking at issues in EJ. This data provides environmental and demographic information for the US and census tract and block groups but in this particular analysis, only the block group data will be explored. 
 
+2. Mapping Inequality: This data comes from the Mapping Inequality: Redlining in New Deal America project. This is an online mapping tool that enables you to explore pre-existing redlining maps for almost every major American City as well as is history of raical and ethnic discrimination in housing policy. As we will see in this analysis,  neighborhoods were given HOLC grades. Those that they deemed "best" and safe investments were given a grade of A and colored green. Those that were deemed "hazardous" were given a grade of "D" and colored red. The map of Los Angeles was selected for this analysis. 
+
+3. Biodiversity: The Global Biodiversity Information Facility is a international network and data infrastructure funded by the worlds government that aims to provides free and open access to biodiversity data. The data used in this analysis is bird observations from 2021 and onward. 
 
 
 ## Relevant Libraries and Setting Path
@@ -32,49 +38,74 @@ library(spData)
 library(spDataLarge)
 library(terra)
 library(dplyr)
-library(leaflet)
 library(ggplot2)
 library(raster)
-library(readr)
-library(readxl)
 library(maps)
 library(spData)
 library(grid)
 library(viridis)
-library(cowplot)
 library(tmap)
 library(tmaptools)
-library(ggsn)
 
+rm(list = ls())
 ```
 
 ## Data Read In
 
-### EJ Screen 
+### LA EJ Screen 
 ```{r}
-# read in EJScreen data
 ejscreen <- st_read("./data/EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb/") 
-
-# filter to LA county
-LA_ejscreen <- ejscreen %>%
-  filter(CNTY_NAME %in% c("Los Angeles County"))
-
+#filter for LA county
+LA <- ejscreen %>%
+  filter(CNTY_NAME %in% c("Los Angeles County")) #filter for Los Angeles County
 ```
+### Biodiversity Data
+```{r}
+biodiversity <- st_read("/Users/katebecker/Documents/Bren/Fall_Q/EDS_223/final/Redlining/Redlining_Injustices/data/gbif-birds-LA") 
+```
+### LA Redlining
+```{r}
+LA_redlining <- st_read("https://dsl.richmond.edu/panorama/redlining/static/citiesData/CALosAngeles1939/geojson.json") %>%
+  st_make_valid() #makes a geometry valid by fixing any topological errors or inconsistencies in the geometry 
+```
+
+## Data Exploration 
+
+Visualizing Variables of Interest 
+```{r}
+plot(LA["ID"])
+plot(LA_redlining["grade"])
+
+plot(biodiversity)
+plot(LA_redlining)
+```
+
+## Analysis 
+
+### Make a map of wastewater discharge by census block groups. Indicate which census block groups are above the 95th percentile of wastewater discharge (P_PWDIS) by adding a centroid 
+
+#### Data Cleaning
 
 ```{r}
-census_95 <- LA %>%
-  filter(P_PWDIS >= 95)
+LA_ejscreen_centroids <- st_centroid(LA) %>% #computes the centroid of each geometryin LA spatial object
+  filter(P_PWDIS > 95) #filters the centroids for census block groups above 95th percentile 
 
-census_95 <- st_centroid(census_95)
+census_95 <- LA %>% 
+  filter(P_PWDIS >= 95) #filters LA spatial object to include only geometries where P_PWDIS is greater than or equal to 95
 
-coordLA <- st_bbox(LA)
-print(coordLA)
+census_95 <- st_centroid(census_95) #calculates the centroids of the geometries in census_95
+
+coordLA <- st_bbox(LA) #extracted the coordinates of LA to use them in the following map 
+
+print(coordLA) 
 ```
+
+#### Map
 
 ```{r}
 LA_waste_1 <- LA %>%
   ggplot() +
-  geom_sf(data = LA, aes(fill = P_PWDIS))+
+  geom_sf(data = LA, aes(fill = P_PWDIS))+ 
   geom_sf(data = census_95, color = "red", shape = 5, size = 0.5) +
   scale_fill_gradient(low = "lightyellow", high = "darkorange", name = "Percentile for Wastewater discharge") +
   coord_sf(
@@ -83,8 +114,14 @@ LA_waste_1 <- LA %>%
   ggtitle("Wastewater in Los Angeles County") 
 
 LA_waste_1
-
 ```
+
+
+
+Find the percent of census block groups that have:  
+- less than 5% of the population is considered low income
+(5 points)
+
 
 ```{r}
 low_income_5 <- LA %>%
@@ -95,24 +132,25 @@ percent_low <- (nrow(low_income_5) / nrow(LA)) * 100
 print(percent_low)
 ```
 
-```{r}
-pm25_80 <- quantile(LA$P_PM25, 0.8, na.rm = TRUE)
-pnpl_80 <- quantile(LA$P_PNPL, 0.8, na.rm = TRUE)
 
-
-pnpl_pm25_80 <- LA %>%
-  filter(P_PM25 > pm25_80, P_PNPL > pnpl_80)
-
-
-above_80t <- (nrow(pnpl_pm25_80) / nrow(LA)) * 100
-
-print(above_80t)
-```
+Find the percent of census block groups that are:    
+- above the 80th percentile for Particulate Matter 2.5 AND  
+- above the 80th percentile for Superfund proximity
+(10 points)
 
 ```{r}
-LA_redlining <- st_read("https://dsl.richmond.edu/panorama/redlining/static/downloads/geojson/CALosAngeles1939.geojson") %>%
-  st_make_valid()
+has_data <- LA %>%
+  filter(!is.na(P_PM25)) %>%
+  filter(!is.na(P_PNPL))
+
+LA %>% 
+  filter(P_PM25 > 80) %>%
+  filter(P_PNPL > 80) %>%
+  nrow()/nrow(has_data)*100
 ```
+
+Make a map of historical redlining boundaries, colored by HOLC grade.
+(5 points)
 
 ```{r}
 coordLA_red <- st_bbox(LA_redlining)
@@ -131,7 +169,7 @@ LA_LAredline <- st_intersects(LAred_transformed, LA)
 LA_LAred <- LA %>%
   ggplot() +
   geom_sf(data = LA) +
-  geom_sf(data = LA_redlining, aes(fill = holc_grade)) +
+  geom_sf(data = LA_redlining, aes(fill = grade)) +
   ggtitle("Redlining in Los Angeles by HOLC Grade") +
   coord_sf(
     ylim = c(3980000, 4139895)
@@ -140,78 +178,72 @@ LA_LAred <- LA %>%
 print(LA_LAred)
 
 ```
+Find the number of census block groups that fall within areas with HOLC grades
+hint: make sure the CRS match
 
 ```{r}
-count_HOLCandCensus <- count(LAred_transformed, holc_grade)
-print(count_HOLCandCensus)
+LA <- st_transform(LA, crs= st_crs(LA_redlining))
 
-LosAngeles_redline_join <- st_join(LA, LAred_transformed, join = st_within, left = FALSE)
 
-mean(LosAngeles_redline_join$LOWINCPCT)
-mean(LosAngeles_redline_join$P_PM25, holc_group = "A")
-mean(LosAngeles_redline_join$P_LIFEEXPPCT, na.rm = TRUE, holc_group = "A")
-mean(LosAngeles_redline_join$P_CANCER)
+binary_list <- st_intersects(x = LA, y = LA_redlining) # returns binary predicate list
+logical_intersect = lengths(binary_list) > 0 # create logical of which items do intersect
+redlining_cbg <- LA[logical_intersect, ] # filter census block groups based on logicals
 
+# the number of census block groups
+print(paste("There are", nrow(redlining_cbg), "census block groups falling within areas with HOLC grades"))
+```
+
+Summarize current conditions based on EJScreen data within historical redlining categories using the mean of the following variables:  
+-% low income.  
+- percentile for particulate Matter 2.5.  
+- percentile for low life expectancy.  
+- percentile for air toxics cancer risk
+(20 points)
+```{r}
+LA_Grade <- st_transform(LA, crs = st_crs(LA_redlining))
+
+LA_red <- st_intersection(LA_redlining, LA_Grade)
+
+LA_red %>%
+  group_by(grade) %>%
+  summarise(lowincpct = mean(LOWINCPCT, na.rm = TRUE),
+            pm25 = mean(P_PM25, na.rm = TRUE),
+            lifeexppct = mean(P_LIFEEXPPCT, na.rm = TRUE),
+            cancer = mean(P_CANCER, na.rm = TRUE))
+```
+
+## Investigating the Legacy 
+Investigate the legacy of redlining in biodiversity observations
+For bird observations from 2022 that fall within neighborhoods with HOLC grads, find the percent of observations within each redlining categories and plot results. hint: make sure that the bird observations have the same CRS as redlining data. (20 points)
+
+```{r}
+bio_22 <- biodiversity  %>%
+  filter(year == 2022) # filter to 2022
+
+# transform data to match CRS
+biodiversity_transform <- st_transform(bio_22, crs = st_crs(LA_redlining))
 ```
 
 
 ```{r}
-sum_mean_redline <- LosAngeles_redline_join %>%
-  group_by(holc_grade) %>%
-  summarise(
-    mean_LOWINCPCT = mean(LOWINCPCT),
-    mean_P_PM25 = mean(P_PM25),
-    mean_P_LIFEEXPPCT = mean(P_LIFEEXPPCT, na.rm = TRUE),
-    mean_P_CANCER = mean(P_CANCER))
+biodiv_data <- st_join(x = biodiversity_transform, y = LA_redlining, join = st_within, left = FALSE)
 
-print(sum_mean_redline)
-```
-
-```{r}
-
-#read in biodiverstiy data
-biodiversity <- st_read("/Users/katebecker/Documents/Bren/Fall_Q/EDS_223/HW/data/gbif-birds-LA") 
-
-```
-
-```{r}
-CRSa <- st_crs(LA_redlining)
-CRSb <- st_crs(biodiversity)
-
-biodiversity_transformed <- st_transform(biodiversity, CRSa)
-
-```
-
-```{r}
-result <- st_join(biodiversity_transformed, LA_redlining, join = st_within, left = FALSE) 
-```
-
-```{r}
-
-result <- st_join(biodiversity_transformed, LA_redlining, join = st_within, left = FALSE) %>%
+biodiv_summary <- biodiv_data %>% 
   st_set_geometry(NULL) %>%
-  count(name = "geometry", holc_grade)
+  group_by(grade) %>%                  
+  summarise(count = n()) %>%      
+  mutate(percentage = (count / sum(count))*100 )
 
-total_count <- sum(result$geometry)
-
-view(total_count)
-
-percentages <- result %>%
-  group_by(holc_grade) %>%
-  summarise(percentage = (geometry / total_count) * 100)
-
-view(percentages)
-
-ggplot(data = percentages, aes(x = holc_grade,y = percentage)) +
-  geom_boxplot(colour = "blue") +
-  ylim(0, 100) +
-  xlab("HOLC Grade") +
-  ylab("Percent Observations") +
-  ggtitle("Biodiversity Observations Within Each Redlining Category")
-
-
-
+ggplot(data = biodiv_summary) +
+  geom_bar(aes(x = grade, y = percentage, fill = grade), stat = "identity") +
+  labs(x = "HOLC grade", y = "Percentage of observations") +
+  scale_fill_discrete() +
+  ggtitle("Redlining in Biodiversity Observations")
 ```
+
+## Findings 
+
+
 
 
 
