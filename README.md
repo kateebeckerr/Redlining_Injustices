@@ -2,11 +2,21 @@
 Investigation of redlining and current environmental injustices by mapping inequality and analyzing biodiversity data
 
 About: 
+The term "environmental injustice" is a word that encompasses our past, present, and future and it represents years of systemic oppression, marginalization, and inequality. Redlining, fore example, was banned 50 years ago but it continues to hurt minorities today. Throughout redlining's history, local zoning officials worked with businesses to place polluting operations such as industrial plants, major roadways and shipping ports around marginalized communities. In terms of housing, it categorically denied access to mortagages not just to individuals but to whole neighborhoods. Socioeconomic factors and redlining are actively being studied today but this analysis will study redlining but from a biodiversity lens. 
+
 
 Highlights: 
+- Employing EJ Screen Data
+- Spatial Mapping 
+- Wrangling geometries
+- Working with large, public, government datasets
 
 Data: 
+1. EJ Screen: Data from the United States Environmental Protection Agency's Environmental Justice Screening and Mapping Tool. This data is publicly accessible in order to be more transparent about how they consider environmental justice(EJ) in their work, to assist stakeholders in making informed decisions about pursuing EJ, and to create a common starting point between the agency and the public when looking at issues in EJ. This data provides environmental and demographic information for the US and census tract and block groups but in this particular analysis, only the block group data will be explored. 
 
+2. Mapping Inequality: This data comes from the Mapping Inequality: Redlining in New Deal America project. This is an online mapping tool that enables you to explore pre-existing redlining maps for almost every major American City as well as is history of raical and ethnic discrimination in housing policy. As we will see in this analysis,  neighborhoods were given HOLC grades. Those that they deemed "best" and safe investments were given a grade of A and colored green. Those that were deemed "hazardous" were given a grade of "D" and colored red. The map of Los Angeles was selected for this analysis. 
+
+3. Biodiversity: The Global Biodiversity Information Facility is a international network and data infrastructure funded by the worlds government that aims to provides free and open access to biodiversity data. The data used in this analysis is bird observations from 2021 and onward. 
 
 Resources: 
 
